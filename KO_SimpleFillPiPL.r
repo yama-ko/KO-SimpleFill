@@ -53,7 +53,7 @@ resource 'PiPL' (16000) {
 			0
 		},
 		AE_Effect_Support_URL {
-			"https://github.com"
+			"https://github.com/yama-ko/KO-SimpleFill"
 		}
 	}
 };

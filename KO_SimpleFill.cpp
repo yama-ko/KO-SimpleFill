@@ -242,7 +242,7 @@ PF_Err PluginDataEntryFunction2(
 		"yama-ko.net",
 		AE_RESERVED_INFO,
 		"EffectMain",
-		"https://github.com");
+		"https://github.com/yama-ko/KO-SimpleFill");
 	return result;
 }
 
