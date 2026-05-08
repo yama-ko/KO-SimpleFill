@@ -182,7 +182,7 @@ ParamsSetup(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_
 	AEFX_CLR_STRUCT(def);
 	PF_ADD_FLOAT_SLIDERX("Amount",
 		0, 100, 0, 100, 100,
-		PF_Precision_TENTHS, 0, 0,
+		PF_Precision_TENTHS, PF_ValueDisplayFlag_PERCENT, 0,
 		AMOUNT_DISK_ID);
 
 	// Invert Alpha checkbox
