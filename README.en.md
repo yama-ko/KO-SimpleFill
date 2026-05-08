@@ -2,6 +2,8 @@
 
 An After Effects plug-in that fills a layer with a solid color using various blend modes.
 
+**[Download latest release](https://github.com/yama-ko/KO-SimpleFill/releases/latest)**
+
 [日本語はこちら](README.ja.md)
 
 ## Features

@@ -2,6 +2,8 @@
 
 After Effectsのプラグイン。レイヤーを指定した色で塗りつぶします。複数のブレンドモードに対応。
 
+**[最新版をダウンロード (Releases)](https://github.com/yama-ko/KO-SimpleFill/releases/latest)**
+
 ## 機能
 
 - **ブレンドモード 10種**: Normal / Add / Negative Add / Multiply / Screen / Overlay / Hard Light / Lighten / Darken / Difference
