@@ -1,56 +1,54 @@
 # KO SimpleFill
 
-An After Effects plug-in that fills a layer with a solid color using various blend modes.
+After Effectsのプラグイン。レイヤーを指定した色で塗りつぶします。複数のブレンドモードに対応。
 
-[日本語はこちら](README.ja.md)
+## 機能
 
-## Features
+- **ブレンドモード 10種**: Normal / Add / Negative Add / Multiply / Screen / Overlay / Hard Light / Lighten / Darken / Difference
+- **Amount**: 全モード共通のブレンド強度（0〜100%）
+- **Invert Alpha**: アルファチャンネルを反転するチェックボックス
+- 8 bpc / 16 bpc 対応
 
-- **10 blend modes**: Normal, Add, Negative Add, Multiply, Screen, Overlay, Hard Light, Lighten, Darken, Difference
-- **Amount**: Controls blend strength for all modes (0–100%)
-- **Invert Alpha**: Checkbox to invert the layer's alpha channel
-- 8 bpc / 16 bpc support
+> **Add** と **Negative Add** はスケール方式（Amountが塗り色の寄与量をスケール）。  
+> その他のモードはlerp方式（AmountがsrcとブレンドResult間を補間）。
 
-> **Add** and **Negative Add** use a scale approach (amount scales the fill contribution).  
-> All other modes use a lerp approach (amount lerps between source and blend result).
+## 動作環境
 
-## Requirements
+- After Effects 2024 以降
+- Windows（macOS対応予定）
 
-- After Effects 2024 or later
-- Windows (macOS support planned)
+## インストール
 
-## Installation
-
-Copy `KO_SimpleFill.aex` to your After Effects plug-ins folder:
+`KO_SimpleFill.aex` を After Effects のプラグインフォルダにコピーします：
 
 ```
-C:\Program Files\Adobe\Adobe After Effects <version>\Support Files\Plug-ins\
+C:\Program Files\Adobe\Adobe After Effects <バージョン>\Support Files\Plug-ins\
 ```
 
-The effect will appear under **yama-ko.net > KO SimpleFill**.
+エフェクトメニューの **yama-ko.net > KO SimpleFill** から適用できます。
 
-## Building from Source
+## ビルド方法
 
-### Prerequisites
+### 必要なもの
 
-- Visual Studio 2022 or later (Desktop development with C++)
-- [After Effects SDK](https://developer.adobe.com/after-effects/) (25.6 or later)
+- Visual Studio 2022 以降（C++ デスクトップ開発）
+- [After Effects SDK](https://developer.adobe.com/after-effects/)（25.6 以降）
 
-### Environment Variables
+### 環境変数の設定
 
-Set the following user environment variables before opening the solution:
+ソリューションを開く前に以下のユーザー環境変数を設定してください：
 
-| Variable | Description | Example |
+| 変数名 | 内容 | 例 |
 |---|---|---|
-| `AE_SDK_ROOT` | Path to the AE SDK `Examples` folder | `C:\AE_SDK\...\Examples` |
-| `AE_PLUGIN_BUILD_DIR` | Output path for `.aex` file | `C:\...\Plug-ins\Effects` |
+| `AE_SDK_ROOT` | AE SDK の `Examples` フォルダのパス | `C:\AE_SDK\...\Examples` |
+| `AE_PLUGIN_BUILD_DIR` | `.aex` の出力先フォルダ | `C:\...\Plug-ins\Effects` |
 
-### Build
+### ビルド手順
 
-1. Open `Win\KO_SimpleFill.sln` in Visual Studio
-2. Select **Release | x64**
-3. Build (Ctrl+Shift+B)
+1. `Win\KO_SimpleFill.sln` を Visual Studio で開く
+2. 構成を **Release | x64** に設定
+3. Ctrl+Shift+B でビルド
 
-## License
+## ライセンス
 
-MIT License — see [LICENSE](LICENSE)
+Apache License 2.0 — [LICENSE](LICENSE) を参照
