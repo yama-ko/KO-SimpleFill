@@ -9,7 +9,7 @@ An After Effects plug-in that fills a layer with a solid color using various ble
 ## Features
 
 - **10 blend modes**: Normal, Add, Negative Add, Multiply, Screen, Overlay, Hard Light, Lighten, Darken, Difference
-- **Amount**: Controls blend strength for all modes (0–100%)
+- **Opacity**: Controls blend strength for all modes (0–100%)
 - **Invert Alpha**: Checkbox to invert the layer's alpha channel
 - 8 bpc / 16 bpc support
 

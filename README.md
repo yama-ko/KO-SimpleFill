@@ -7,12 +7,12 @@ After Effectsのプラグイン。レイヤーを指定した色で塗りつぶ�
 ## 機能
 
 - **ブレンドモード 10種**: Normal / Add / Negative Add / Multiply / Screen / Overlay / Hard Light / Lighten / Darken / Difference
-- **Amount**: 全モード共通のブレンド強度（0〜100%）
+- **Opacity**: 全モード共通のブレンド強度（0〜100%）
 - **Invert Alpha**: アルファチャンネルを反転するチェックボックス
 - 8 bpc / 16 bpc 対応
 
-> **Add** と **Negative Add** はスケール方式（Amountが塗り色の寄与量をスケール）。  
-> その他のモードはlerp方式（AmountがsrcとブレンドResult間を補間）。
+> **Add** と **Negative Add** はスケール方式（Opacityが塗り色の寄与量をスケール）。  
+> その他のモードはlerp方式（OpacityがsrcとブレンドResult間を補間）。
 
 ## 動作環境
 

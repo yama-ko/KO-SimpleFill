@@ -178,9 +178,9 @@ ParamsSetup(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_
 		"|Lighten|Darken|Difference",
 		BLEND_MODE_DISK_ID);
 
-	// Amount
+	// Opacity
 	AEFX_CLR_STRUCT(def);
-	PF_ADD_FLOAT_SLIDERX("Amount",
+	PF_ADD_FLOAT_SLIDERX("Opacity",
 		0, 100, 0, 100, 100,
 		PF_Precision_TENTHS, PF_ValueDisplayFlag_PERCENT, 0,
 		AMOUNT_DISK_ID);
