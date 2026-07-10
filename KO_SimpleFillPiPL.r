@@ -44,7 +44,7 @@ resource 'PiPL' (16000) {
 			0x02000000	/* PF_OutFlag_DEEP_COLOR_AWARE */
 		},
 		AE_Effect_Global_OutFlags_2 {
-			0x00000000
+			0x08000000	/* PF_OutFlag2_SUPPORTS_THREADED_RENDERING */
 		},
 		AE_Effect_Match_Name {
 			"KO_SimpleFill"
