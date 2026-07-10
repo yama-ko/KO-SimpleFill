@@ -358,7 +358,8 @@ GlobalSetup(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_
 {
 	out_data->my_version = PF_VERSION(
 		MAJOR_VERSION, MINOR_VERSION, BUG_VERSION, STAGE_VERSION, BUILD_VERSION);
-	out_data->out_flags  = PF_OutFlag_DEEP_COLOR_AWARE;
+	out_data->out_flags  = PF_OutFlag_DEEP_COLOR_AWARE
+	                     | PF_OutFlag_SEND_UPDATE_PARAMS_UI;       // disable Dither Seed when unused
 	out_data->out_flags2 = PF_OutFlag2_SUPPORTS_SMART_RENDER       // 8/16/32 bpc
 	                     | PF_OutFlag2_FLOAT_COLOR_AWARE
 	                     | PF_OutFlag2_SUPPORTS_THREADED_RENDERING; // MFR (render is stateless)
@@ -418,6 +419,29 @@ ParamsSetup(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_
 		DITHER_SEED_DISK_ID);
 
 	out_data->num_params = FILL_NUM_PARAMS;
+	return err;
+}
+
+// Gray out Dither Seed unless a dither blend mode is selected.
+static PF_Err
+UpdateParamsUI(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_LayerDef *output)
+{
+	PF_Err  err    = PF_Err_NONE;
+	A_long  mode   = PopupToBlendMode(params[FILL_BLEND_MODE]->u.pd.value);
+	bool    dither = (mode == BLEND_DITHER || mode == BLEND_DITHER_ONLY);
+
+	PF_ParamDef seed = *params[FILL_DITHER_SEED];
+	A_long before = seed.ui_flags;
+	if (dither) seed.ui_flags &= ~PF_PUI_DISABLED;
+	else        seed.ui_flags |=  PF_PUI_DISABLED;
+
+	if (seed.ui_flags != before) {
+		PF_ParamUtilsSuite3 *pusP = NULL;
+		if (in_data->pica_basicP->AcquireSuite(kPFParamUtilsSuite, kPFParamUtilsSuiteVersion3, (const void **)&pusP) == PF_Err_NONE && pusP) {
+			pusP->PF_UpdateParamUI(in_data->effect_ref, FILL_DITHER_SEED, &seed);
+			in_data->pica_basicP->ReleaseSuite(kPFParamUtilsSuite, kPFParamUtilsSuiteVersion3);
+		}
+	}
 	return err;
 }
 
@@ -564,6 +588,7 @@ EffectMain(
 			case PF_Cmd_ABOUT:            err = About(in_data, out_data, params, output);       break;
 			case PF_Cmd_GLOBAL_SETUP:     err = GlobalSetup(in_data, out_data, params, output); break;
 			case PF_Cmd_PARAMS_SETUP:     err = ParamsSetup(in_data, out_data, params, output); break;
+			case PF_Cmd_UPDATE_PARAMS_UI: err = UpdateParamsUI(in_data, out_data, params, output); break;
 			case PF_Cmd_RENDER:           err = Render(in_data, out_data, params, output);       break;
 			case PF_Cmd_SMART_PRE_RENDER: err = SmartPreRender(in_data, out_data, (PF_PreRenderExtra*)extra);  break;
 			case PF_Cmd_SMART_RENDER:     err = SmartRender(in_data, out_data, (PF_SmartRenderExtra*)extra);   break;

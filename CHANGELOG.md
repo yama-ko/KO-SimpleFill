@@ -4,7 +4,7 @@
 
 ### Added
 - Blend modes aligned with KO BandFill: Soft Light, Linear Light, Hue, Saturation, Color, Luminosity, Dither, Dither Only
-- Dither Seed parameter (used by Dither / Dither Only)
+- Dither Seed parameter (used by Dither / Dither Only; grayed out unless a dither mode is selected)
 - Multi-Frame Rendering (MFR) support
 - SmartRender pipeline: 32-bit float rendering, plus layer-mask and compositing-options mask support (offset-sampled source + output-origin correction). Legacy Render retained as a fallback for hosts that don't drive SmartRender.
 
