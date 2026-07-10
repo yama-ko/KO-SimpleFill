@@ -39,8 +39,8 @@
     <_ProjectFileVersion>10.0.40219.1</_ProjectFileVersion>
     <!-- AE_SDK_ROOT: path to the AE SDK Examples folder (set as user environment variable) -->
     <!-- AE_PLUGIN_BUILD_DIR: path to AE Plug-ins output folder (set as user environment variable) -->
-    <!-- Debug → AE Plug-ins folder for quick testing -->
-    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(AE_PLUGIN_BUILD_DIR)\</OutDir>
+    <!-- Debug → MediaCore common Plug-ins folder for quick testing -->
+    <OutDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">C:\Program Files\Adobe\Common\Plug-ins\7.0\MediaCore\yama-ko.net\</OutDir>
     <!-- Release → dist/ in the repo root for packaging and GitHub Releases -->
     <OutDir Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(SolutionDir)..\dist\</OutDir>
     <IntDir Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(Platform)\$(Configuration)\</IntDir>
