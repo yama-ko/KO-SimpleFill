@@ -402,8 +402,13 @@ ParamsSetup(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_
 		PF_Precision_TENTHS, PF_ValueDisplayFlag_PERCENT, 0,
 		AMOUNT_DISK_ID);
 
-	// Dither Seed (used by Dither / Dither Only modes)
+	// Dither Seed (used by Dither / Dither Only modes).
+	// COLLAPSE_TWIRLY: keep the twirly collapsed (PF_UpdateParamUI re-applies this flag,
+	// so leaving it unset would force the twirly open on every UI refresh).
+	// Disabled by default since the default mode (Normal) isn't a dither mode.
 	AEFX_CLR_STRUCT(def);
+	def.flags    = PF_ParamFlag_COLLAPSE_TWIRLY;
+	def.ui_flags = PF_PUI_DISABLED;
 	PF_ADD_SLIDER("Dither Seed",
 		0, 10000, 0, 1000, 0,
 		DITHER_SEED_DISK_ID);
@@ -421,6 +426,7 @@ UpdateParamsUI(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], 
 	bool    dither = (mode == BLEND_DITHER || mode == BLEND_DITHER_ONLY);
 
 	PF_ParamDef seed = *params[FILL_DITHER_SEED];
+	seed.flags |= PF_ParamFlag_COLLAPSE_TWIRLY; // never force the twirly open on refresh
 	A_long before = seed.ui_flags;
 	if (dither) seed.ui_flags &= ~PF_PUI_DISABLED;
 	else        seed.ui_flags |=  PF_PUI_DISABLED;
