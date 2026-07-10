@@ -50,7 +50,6 @@ enum {
 	FILL_COLOR,
 	FILL_BLEND_MODE,
 	FILL_AMOUNT,
-	FILL_INVERT_ALPHA,
 	FILL_DITHER_SEED,
 	FILL_NUM_PARAMS
 };
@@ -59,7 +58,6 @@ enum {
 	COLOR_DISK_ID = 1,
 	BLEND_MODE_DISK_ID,
 	AMOUNT_DISK_ID,
-	INVERT_ALPHA_DISK_ID,
 	DITHER_SEED_DISK_ID,
 };
 
@@ -89,7 +87,6 @@ typedef struct FillInfo {
 	PF_Pixel8  color;
 	A_long     blendMode;   // BlendMode enum
 	PF_FpLong  amount;      // 0.0 - 1.0
-	PF_Boolean invertAlpha;
 	A_long     ditherSeed;  // Dither / Dither Only
 
 	// SmartRender only (legacy Render leaves these zeroed → sample inP directly).

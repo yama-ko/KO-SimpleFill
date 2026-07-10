@@ -8,6 +8,9 @@
 - Multi-Frame Rendering (MFR) support
 - SmartRender pipeline: 32-bit float rendering, plus layer-mask and compositing-options mask support (offset-sampled source + output-origin correction). Legacy Render retained as a fallback for hosts that don't drive SmartRender.
 
+### Removed
+- **Invert Alpha** parameter (confusing under non-Normal blend modes)
+
 ### Changed
 - **Breaking:** Blend Mode popup reordered to match KO BandFill. Existing projects using **Hard Light, Lighten, Darken, or Difference** will need those blend modes re-selected (their popup index shifted when Soft Light and Linear Light were inserted). Normal, Add, Negative Add, Multiply, Screen, Overlay are unaffected.
 

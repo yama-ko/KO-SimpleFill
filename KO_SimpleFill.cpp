@@ -234,7 +234,7 @@ FillFunc8(void *refcon, A_long xL, A_long yL, PF_Pixel8 *inP, PF_Pixel8 *outP)
 
 	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
 		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
-	PF_FpLong a = fiP->invertAlpha ? (1.0 - o.a) : o.a;
+	PF_FpLong a = o.a;
 
 	outP->red   = (A_u_char)(Clamp01(o.r) * 255.0 + 0.5);
 	outP->green = (A_u_char)(Clamp01(o.g) * 255.0 + 0.5);
@@ -264,7 +264,7 @@ FillFunc16(void *refcon, A_long xL, A_long yL, PF_Pixel16 *inP, PF_Pixel16 *outP
 
 	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
 		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
-	PF_FpLong a = fiP->invertAlpha ? (1.0 - o.a) : o.a;
+	PF_FpLong a = o.a;
 
 	outP->red   = (A_u_short)(Clamp01(o.r) * max16 + 0.5);
 	outP->green = (A_u_short)(Clamp01(o.g) * max16 + 0.5);
@@ -293,7 +293,7 @@ FillFunc32(void *refcon, A_long xL, A_long yL, PF_PixelFloat *inP, PF_PixelFloat
 
 	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
 		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
-	PF_FpLong a = fiP->invertAlpha ? (1.0 - o.a) : o.a;
+	PF_FpLong a = o.a;
 
 	// 32-bit float: preserve out-of-range (HDR) values, do not clamp rgb.
 	outP->red   = (PF_FpShort)o.r;
@@ -312,7 +312,6 @@ static void BuildFillInfo(PF_ParamDef *params[], FillInfo &fi)
 	fi.color       = params[FILL_COLOR]->u.cd.value;
 	fi.blendMode   = PopupToBlendMode(params[FILL_BLEND_MODE]->u.pd.value);
 	fi.amount      = params[FILL_AMOUNT]->u.fs_d.value / 100.0;
-	fi.invertAlpha = params[FILL_INVERT_ALPHA]->u.bd.value ? TRUE : FALSE;
 	fi.ditherSeed  = params[FILL_DITHER_SEED]->u.sd.value;
 }
 
@@ -402,15 +401,6 @@ ParamsSetup(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_
 		0, 100, 0, 100, 100,
 		PF_Precision_TENTHS, PF_ValueDisplayFlag_PERCENT, 0,
 		AMOUNT_DISK_ID);
-
-	// Invert Alpha checkbox
-	AEFX_CLR_STRUCT(def);
-	def.param_type      = PF_Param_CHECKBOX;
-	def.u.bd.value      = FALSE;
-	def.u.bd.dephault   = FALSE;
-	def.uu.id           = INVERT_ALPHA_DISK_ID;
-	PF_STRNNCPY(def.PF_DEF_NAME, "Invert Alpha", sizeof(def.PF_DEF_NAME));
-	ERR(PF_ADD_PARAM(in_data, -1, &def));
 
 	// Dither Seed (used by Dither / Dither Only modes)
 	AEFX_CLR_STRUCT(def);
