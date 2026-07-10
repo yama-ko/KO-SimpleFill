@@ -15,12 +15,16 @@
 	Hue/Saturation/Color/Luminosity are non-separable (need all 3 channels).
 	Dither / Dither Only are probabilistic (per-pixel hash < amount).
 	All other modes use lerp (amount lerps src toward blend result).
+
+	Rendering: SmartRender (8/16/32 bpc, layer/composite-options masks) with a
+	legacy Render fallback for hosts that don't drive SmartRender (e.g. Premiere).
 */
 
 #include "KO_SimpleFill.h"
 
 #include <cstdint>
 #include <cmath>
+#include <new>
 
 // -------------------------------------------------------------------
 // Popup value -> internal BlendMode
@@ -185,7 +189,7 @@ static void ApplyBlendRGB(
 }
 
 // -------------------------------------------------------------------
-// Per-pixel compose (normalized). Returns rgb + coverage alpha.
+// Per-pixel compose (normalized). xL/yL are LAYER-space coords (for dither).
 // -------------------------------------------------------------------
 
 struct OutPix { PF_FpLong r, g, b, a; };
@@ -216,10 +220,20 @@ FillFunc8(void *refcon, A_long xL, A_long yL, PF_Pixel8 *inP, PF_Pixel8 *outP)
 	FillInfoP fiP = reinterpret_cast<FillInfoP>(refcon);
 	if (!fiP) return PF_Err_NONE;
 
-	PF_FpLong sr = inP->red/255.0, sg = inP->green/255.0, sb = inP->blue/255.0, sa = inP->alpha/255.0;
+	PF_FpLong sr, sg, sb, sa;
+	if (fiP->src_world) {
+		A_long sx = xL - fiP->src_off_x, sy = yL - fiP->src_off_y;
+		if (sx >= 0 && sx < fiP->src_world->width && sy >= 0 && sy < fiP->src_world->height) {
+			PF_Pixel8 *p = (PF_Pixel8*)((char*)fiP->src_world->data + sy*fiP->src_world->rowbytes) + sx;
+			sr = p->red/255.0; sg = p->green/255.0; sb = p->blue/255.0; sa = p->alpha/255.0;
+		} else { sr = sg = sb = sa = 0.0; }
+	} else {
+		sr = inP->red/255.0; sg = inP->green/255.0; sb = inP->blue/255.0; sa = inP->alpha/255.0;
+	}
 	PF_FpLong fr = fiP->color.red/255.0, fg = fiP->color.green/255.0, fb = fiP->color.blue/255.0;
 
-	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount, xL, yL, fiP->ditherSeed);
+	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
+		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
 	PF_FpLong a = fiP->invertAlpha ? (1.0 - o.a) : o.a;
 
 	outP->red   = (A_u_char)(Clamp01(o.r) * 255.0 + 0.5);
@@ -236,10 +250,20 @@ FillFunc16(void *refcon, A_long xL, A_long yL, PF_Pixel16 *inP, PF_Pixel16 *outP
 	if (!fiP) return PF_Err_NONE;
 
 	PF_FpLong max16 = (PF_FpLong)PF_MAX_CHAN16;
-	PF_FpLong sr = inP->red/max16, sg = inP->green/max16, sb = inP->blue/max16, sa = inP->alpha/max16;
+	PF_FpLong sr, sg, sb, sa;
+	if (fiP->src_world) {
+		A_long sx = xL - fiP->src_off_x, sy = yL - fiP->src_off_y;
+		if (sx >= 0 && sx < fiP->src_world->width && sy >= 0 && sy < fiP->src_world->height) {
+			PF_Pixel16 *p = (PF_Pixel16*)((char*)fiP->src_world->data + sy*fiP->src_world->rowbytes) + sx;
+			sr = p->red/max16; sg = p->green/max16; sb = p->blue/max16; sa = p->alpha/max16;
+		} else { sr = sg = sb = sa = 0.0; }
+	} else {
+		sr = inP->red/max16; sg = inP->green/max16; sb = inP->blue/max16; sa = inP->alpha/max16;
+	}
 	PF_FpLong fr = fiP->color.red/255.0, fg = fiP->color.green/255.0, fb = fiP->color.blue/255.0;
 
-	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount, xL, yL, fiP->ditherSeed);
+	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
+		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
 	PF_FpLong a = fiP->invertAlpha ? (1.0 - o.a) : o.a;
 
 	outP->red   = (A_u_short)(Clamp01(o.r) * max16 + 0.5);
@@ -247,6 +271,70 @@ FillFunc16(void *refcon, A_long xL, A_long yL, PF_Pixel16 *inP, PF_Pixel16 *outP
 	outP->blue  = (A_u_short)(Clamp01(o.b) * max16 + 0.5);
 	outP->alpha = (A_u_short)(Clamp01(a)   * max16 + 0.5);
 	return PF_Err_NONE;
+}
+
+static PF_Err
+FillFunc32(void *refcon, A_long xL, A_long yL, PF_PixelFloat *inP, PF_PixelFloat *outP)
+{
+	FillInfoP fiP = reinterpret_cast<FillInfoP>(refcon);
+	if (!fiP) return PF_Err_NONE;
+
+	PF_FpLong sr, sg, sb, sa;
+	if (fiP->src_world) {
+		A_long sx = xL - fiP->src_off_x, sy = yL - fiP->src_off_y;
+		if (sx >= 0 && sx < fiP->src_world->width && sy >= 0 && sy < fiP->src_world->height) {
+			PF_PixelFloat *p = (PF_PixelFloat*)((char*)fiP->src_world->data + sy*fiP->src_world->rowbytes) + sx;
+			sr = p->red; sg = p->green; sb = p->blue; sa = p->alpha;
+		} else { sr = sg = sb = sa = 0.0; }
+	} else {
+		sr = inP->red; sg = inP->green; sb = inP->blue; sa = inP->alpha;
+	}
+	PF_FpLong fr = fiP->color.red/255.0, fg = fiP->color.green/255.0, fb = fiP->color.blue/255.0;
+
+	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
+		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
+	PF_FpLong a = fiP->invertAlpha ? (1.0 - o.a) : o.a;
+
+	// 32-bit float: preserve out-of-range (HDR) values, do not clamp rgb.
+	outP->red   = (PF_FpShort)o.r;
+	outP->green = (PF_FpShort)o.g;
+	outP->blue  = (PF_FpShort)o.b;
+	outP->alpha = (PF_FpShort)a;
+	return PF_Err_NONE;
+}
+
+// -------------------------------------------------------------------
+// Shared helpers
+// -------------------------------------------------------------------
+
+static void BuildFillInfo(PF_ParamDef *params[], FillInfo &fi)
+{
+	fi.color       = params[FILL_COLOR]->u.cd.value;
+	fi.blendMode   = PopupToBlendMode(params[FILL_BLEND_MODE]->u.pd.value);
+	fi.amount      = params[FILL_AMOUNT]->u.fs_d.value / 100.0;
+	fi.invertAlpha = params[FILL_INVERT_ALPHA]->u.bd.value ? TRUE : FALSE;
+	fi.ditherSeed  = params[FILL_DITHER_SEED]->u.sd.value;
+}
+
+// Dispatch iterate by the destination world's bit depth (8 / 16 / 32).
+static PF_Err IterateFill(PF_InData *in_data, FillInfo &fi, PF_EffectWorld *src, PF_EffectWorld *dst)
+{
+	PF_Err err = PF_Err_NONE;
+	AEGP_SuiteHandler suites(in_data->pica_basicP);
+	A_long linesL = dst->height;
+
+	PF_PixelFormat fmt = PF_PixelFormat_ARGB32;
+	PF_WorldSuite2 *ws2P = NULL;
+	in_data->pica_basicP->AcquireSuite(kPFWorldSuite, kPFWorldSuiteVersion2, (const void **)&ws2P);
+	if (ws2P) { ws2P->PF_GetPixelFormat(dst, &fmt); in_data->pica_basicP->ReleaseSuite(kPFWorldSuite, kPFWorldSuiteVersion2); }
+
+	if (fmt == PF_PixelFormat_ARGB128)
+		ERR(suites.IterateFloatSuite1()->iterate(in_data, 0, linesL, src, NULL, (void*)&fi, FillFunc32, dst));
+	else if (fmt == PF_PixelFormat_ARGB64)
+		ERR(suites.Iterate16Suite2()->iterate(in_data, 0, linesL, src, NULL, (void*)&fi, FillFunc16, dst));
+	else
+		ERR(suites.Iterate8Suite2()->iterate(in_data, 0, linesL, src, NULL, (void*)&fi, FillFunc8, dst));
+	return err;
 }
 
 // -------------------------------------------------------------------
@@ -271,8 +359,9 @@ GlobalSetup(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_
 	out_data->my_version = PF_VERSION(
 		MAJOR_VERSION, MINOR_VERSION, BUG_VERSION, STAGE_VERSION, BUILD_VERSION);
 	out_data->out_flags  = PF_OutFlag_DEEP_COLOR_AWARE;
-	// MFR: render is stateless (no globals / sequence data) → thread-safe.
-	out_data->out_flags2 = PF_OutFlag2_SUPPORTS_THREADED_RENDERING;
+	out_data->out_flags2 = PF_OutFlag2_SUPPORTS_SMART_RENDER       // 8/16/32 bpc
+	                     | PF_OutFlag2_FLOAT_COLOR_AWARE
+	                     | PF_OutFlag2_SUPPORTS_THREADED_RENDERING; // MFR (render is stateless)
 	return PF_Err_NONE;
 }
 
@@ -332,31 +421,110 @@ ParamsSetup(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_
 	return err;
 }
 
+// Legacy render path (no mask/composite-options; used by hosts that don't drive SmartRender).
 static PF_Err
 Render(PF_InData *in_data, PF_OutData *out_data, PF_ParamDef *params[], PF_LayerDef *output)
 {
 	PF_Err err = PF_Err_NONE;
-	AEGP_SuiteHandler suites(in_data->pica_basicP);
 
 	FillInfo fi;
 	AEFX_CLR_STRUCT(fi);
-	fi.color       = params[FILL_COLOR]->u.cd.value;
-	fi.blendMode   = PopupToBlendMode(params[FILL_BLEND_MODE]->u.pd.value);
-	fi.amount      = params[FILL_AMOUNT]->u.fs_d.value / 100.0;
-	fi.invertAlpha = params[FILL_INVERT_ALPHA]->u.bd.value ? TRUE : FALSE;
-	fi.ditherSeed  = params[FILL_DITHER_SEED]->u.sd.value;
+	BuildFillInfo(params, fi); // src_world stays NULL → FillFunc samples inP
 
-	A_long linesL = output->extent_hint.bottom - output->extent_hint.top;
+	ERR(IterateFill(in_data, fi, &params[FILL_INPUT]->u.ld, output));
+	return err;
+}
 
-	if (PF_WORLD_IS_DEEP(output)) {
-		ERR(suites.Iterate16Suite2()->iterate(
-			in_data, 0, linesL, &params[FILL_INPUT]->u.ld,
-			NULL, (void*)&fi, FillFunc16, output));
-	} else {
-		ERR(suites.Iterate8Suite2()->iterate(
-			in_data, 0, linesL, &params[FILL_INPUT]->u.ld,
-			NULL, (void*)&fi, FillFunc8, output));
+static PF_Err
+SmartPreRender(PF_InData *in_data, PF_OutData *out_data, PF_PreRenderExtra *extra)
+{
+	A_long ds_num = in_data->downsample_x.num, ds_den = (A_long)in_data->downsample_x.den;
+	if (ds_den < 1) ds_den = 1;
+	A_long ds_w = (A_long)((PF_FpLong)in_data->width  * ds_num / ds_den + 0.5);
+	A_long ds_h = (A_long)((PF_FpLong)in_data->height * in_data->downsample_y.num / (A_long)in_data->downsample_y.den + 0.5);
+	if (ds_w < 1) ds_w = 1;
+	if (ds_h < 1) ds_h = 1;
+
+	const PF_Rect &req = extra->input->output_request.rect;
+	extra->output->result_rect.left   = MAX(req.left,   0L);
+	extra->output->result_rect.top    = MAX(req.top,    0L);
+	extra->output->result_rect.right  = MIN(req.right,  ds_w);
+	extra->output->result_rect.bottom = MIN(req.bottom, ds_h);
+	extra->output->max_result_rect    = { 0, 0, ds_w, ds_h };
+	extra->output->solid              = FALSE;
+
+	// Declare dependency on the source layer so checkout_layer_pixels works in
+	// SmartRender. Save the checked-out rect (= src_worldP layer-space origin) so
+	// SmartRender can offset-sample it correctly under a mask bounding box.
+	PF_RenderRequest src_req = extra->input->output_request;
+	src_req.rect             = extra->output->result_rect;
+	A_long time_step = in_data->time_step > 0 ? in_data->time_step : 1;
+	PF_CheckoutResult src_result = {};
+	extra->cb->checkout_layer(in_data->effect_ref,
+		FILL_INPUT, FILL_INPUT,
+		&src_req,
+		in_data->current_time, time_step, in_data->time_scale,
+		&src_result);
+
+	PF_Rect *rd = new(std::nothrow) PF_Rect(src_result.result_rect);
+	if (rd) {
+		extra->output->pre_render_data = rd;
+		extra->output->delete_pre_render_data_func = [](void *p){ delete static_cast<PF_Rect*>(p); };
 	}
+	return PF_Err_NONE;
+}
+
+static PF_Err
+SmartRender(PF_InData *in_data, PF_OutData *out_data, PF_SmartRenderExtra *extra)
+{
+	PF_Err err = PF_Err_NONE;
+
+	// checkout_layer_pixels must precede checkout_output (AE requirement).
+	PF_EffectWorld *src_worldP = nullptr;
+	PF_Err src_err = extra->cb->checkout_layer_pixels(in_data->effect_ref, FILL_INPUT, &src_worldP);
+
+	PF_EffectWorld *output_worldP = NULL;
+	ERR(extra->cb->checkout_output(in_data->effect_ref, &output_worldP));
+	if (err || !output_worldP) {
+		if (src_err == PF_Err_NONE) extra->cb->checkin_layer_pixels(in_data->effect_ref, FILL_INPUT);
+		return err;
+	}
+
+	A_long time_step = in_data->time_step > 0 ? in_data->time_step : 1;
+	PF_ParamDef  param_storage[FILL_NUM_PARAMS] = {};
+	PF_ParamDef *params_ptrs[FILL_NUM_PARAMS]   = {};
+	for (int i = FILL_COLOR; i < FILL_NUM_PARAMS; i++) {
+		if (PF_CHECKOUT_PARAM(in_data, i, in_data->current_time, time_step, in_data->time_scale, &param_storage[i]) == PF_Err_NONE)
+			params_ptrs[i] = &param_storage[i];
+	}
+
+	FillInfo fi;
+	AEFX_CLR_STRUCT(fi);
+	BuildFillInfo(params_ptrs, fi);
+
+	// Output world's layer-space origin O — non-zero when AE clips the output to a
+	// compositing-options mask bbox. iterate then passes (xL,yL) as 0-based coords in
+	// that sub-rect, so layer_x = O + xL. in_data->output_origin does NOT capture this.
+	A_long o_x = MAX(extra->input->output_request.rect.left, 0L);
+	A_long o_y = MAX(extra->input->output_request.rect.top,  0L);
+	fi.out_origin_x = o_x;
+	fi.out_origin_y = o_y;
+
+	// Masked source: sample src_worldP directly in FillFunc.
+	// src_worldP origin in layer space = result_rect saved by SmartPreRender.
+	// FillFunc maps output (xL,yL) → src ((xL+O) - src_origin) = xL - src_off.
+	fi.src_world = src_worldP;
+	const PF_Rect *rd = static_cast<const PF_Rect*>(extra->input->pre_render_data);
+	fi.src_off_x = (rd ? rd->left : 0) - o_x;
+	fi.src_off_y = (rd ? rd->top  : 0) - o_y;
+
+	for (int i = FILL_COLOR; i < FILL_NUM_PARAMS; i++) {
+		if (params_ptrs[i]) PF_CHECKIN_PARAM(in_data, &param_storage[i]);
+	}
+
+	ERR(IterateFill(in_data, fi, output_worldP, output_worldP));
+
+	if (src_err == PF_Err_NONE) extra->cb->checkin_layer_pixels(in_data->effect_ref, FILL_INPUT);
 	return err;
 }
 
@@ -393,10 +561,12 @@ EffectMain(
 	PF_Err err = PF_Err_NONE;
 	try {
 		switch (cmd) {
-			case PF_Cmd_ABOUT:        err = About(in_data, out_data, params, output);       break;
-			case PF_Cmd_GLOBAL_SETUP: err = GlobalSetup(in_data, out_data, params, output); break;
-			case PF_Cmd_PARAMS_SETUP: err = ParamsSetup(in_data, out_data, params, output); break;
-			case PF_Cmd_RENDER:       err = Render(in_data, out_data, params, output);       break;
+			case PF_Cmd_ABOUT:            err = About(in_data, out_data, params, output);       break;
+			case PF_Cmd_GLOBAL_SETUP:     err = GlobalSetup(in_data, out_data, params, output); break;
+			case PF_Cmd_PARAMS_SETUP:     err = ParamsSetup(in_data, out_data, params, output); break;
+			case PF_Cmd_RENDER:           err = Render(in_data, out_data, params, output);       break;
+			case PF_Cmd_SMART_PRE_RENDER: err = SmartPreRender(in_data, out_data, (PF_PreRenderExtra*)extra);  break;
+			case PF_Cmd_SMART_RENDER:     err = SmartRender(in_data, out_data, (PF_SmartRenderExtra*)extra);   break;
 		}
 	}
 	catch (PF_Err &thrown_err) { err = thrown_err; }

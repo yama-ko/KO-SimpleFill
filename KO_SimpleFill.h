@@ -91,6 +91,11 @@ typedef struct FillInfo {
 	PF_FpLong  amount;      // 0.0 - 1.0
 	PF_Boolean invertAlpha;
 	A_long     ditherSeed;  // Dither / Dither Only
+
+	// SmartRender only (legacy Render leaves these zeroed → sample inP directly).
+	PF_EffectWorld *src_world;                 // masked source; NULL → use inP
+	A_long          src_off_x, src_off_y;      // src_world layer-space origin, minus output origin O
+	A_long          out_origin_x, out_origin_y; // output world origin O (composite-options mask bbox)
 } FillInfo, *FillInfoP, **FillInfoH;
 
 extern "C" {
