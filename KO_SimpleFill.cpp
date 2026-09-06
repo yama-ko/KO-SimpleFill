@@ -221,9 +221,9 @@ FillFunc8(void *refcon, A_long xL, A_long yL, PF_Pixel8 *inP, PF_Pixel8 *outP)
 	if (!fiP) return PF_Err_NONE;
 
 	PF_FpLong sr, sg, sb, sa;
-	if (fiP->src_world) {
+	if (fiP->is_smart) {
 		A_long sx = xL - fiP->src_off_x, sy = yL - fiP->src_off_y;
-		if (sx >= 0 && sx < fiP->src_world->width && sy >= 0 && sy < fiP->src_world->height) {
+		if (sx >= 0 && sx < fiP->src_w && sy >= 0 && sy < fiP->src_h) {
 			PF_Pixel8 *p = (PF_Pixel8*)((char*)fiP->src_world->data + sy*fiP->src_world->rowbytes) + sx;
 			sr = p->red/255.0; sg = p->green/255.0; sb = p->blue/255.0; sa = p->alpha/255.0;
 		} else { sr = sg = sb = sa = 0.0; }
@@ -251,9 +251,9 @@ FillFunc16(void *refcon, A_long xL, A_long yL, PF_Pixel16 *inP, PF_Pixel16 *outP
 
 	PF_FpLong max16 = (PF_FpLong)PF_MAX_CHAN16;
 	PF_FpLong sr, sg, sb, sa;
-	if (fiP->src_world) {
+	if (fiP->is_smart) {
 		A_long sx = xL - fiP->src_off_x, sy = yL - fiP->src_off_y;
-		if (sx >= 0 && sx < fiP->src_world->width && sy >= 0 && sy < fiP->src_world->height) {
+		if (sx >= 0 && sx < fiP->src_w && sy >= 0 && sy < fiP->src_h) {
 			PF_Pixel16 *p = (PF_Pixel16*)((char*)fiP->src_world->data + sy*fiP->src_world->rowbytes) + sx;
 			sr = p->red/max16; sg = p->green/max16; sb = p->blue/max16; sa = p->alpha/max16;
 		} else { sr = sg = sb = sa = 0.0; }
@@ -280,9 +280,9 @@ FillFunc32(void *refcon, A_long xL, A_long yL, PF_PixelFloat *inP, PF_PixelFloat
 	if (!fiP) return PF_Err_NONE;
 
 	PF_FpLong sr, sg, sb, sa;
-	if (fiP->src_world) {
+	if (fiP->is_smart) {
 		A_long sx = xL - fiP->src_off_x, sy = yL - fiP->src_off_y;
-		if (sx >= 0 && sx < fiP->src_world->width && sy >= 0 && sy < fiP->src_world->height) {
+		if (sx >= 0 && sx < fiP->src_w && sy >= 0 && sy < fiP->src_h) {
 			PF_PixelFloat *p = (PF_PixelFloat*)((char*)fiP->src_world->data + sy*fiP->src_world->rowbytes) + sx;
 			sr = p->red; sg = p->green; sb = p->blue; sa = p->alpha;
 		} else { sr = sg = sb = sa = 0.0; }
@@ -533,10 +533,28 @@ SmartRender(PF_InData *in_data, PF_OutData *out_data, PF_SmartRenderExtra *extra
 	// Masked source: sample src_worldP directly in FillFunc.
 	// src_worldP origin in layer space = result_rect saved by SmartPreRender.
 	// FillFunc maps output (xL,yL) → src ((xL+O) - src_origin) = xL - src_off.
+	//
+	// Bounded by the rect AE says it rendered, not by the world's own size. The checkout
+	// promises result_rect and nothing outside it -- "can be empty", says AE_Effect.h -- and
+	// an adjustment layer with nothing under it makes it empty. Read the world's full extent
+	// then and what comes back is whatever the buffer pool last held: a stale cached frame,
+	// which arrives as a regular grid of specks that follow the fill colour and never appear
+	// over an opaque layer.
+	//
+	// When the checkout fails or comes back empty the extent stays zero and every pixel reads
+	// as transparent. Falling back to inP is not available here: IterateFill is handed the
+	// output world as its input, so inP aliases pixels AE has not written.
+	fi.is_smart  = 1;
 	fi.src_world = src_worldP;
 	const PF_Rect *rd = static_cast<const PF_Rect*>(extra->input->pre_render_data);
-	fi.src_off_x = (rd ? rd->left : 0) - o_x;
-	fi.src_off_y = (rd ? rd->top  : 0) - o_y;
+	if (src_err == PF_Err_NONE && src_worldP && rd) {
+		fi.src_off_x = rd->left - o_x;
+		fi.src_off_y = rd->top  - o_y;
+		fi.src_w = MIN(rd->right  - rd->left, src_worldP->width);
+		fi.src_h = MIN(rd->bottom - rd->top,  src_worldP->height);
+		if (fi.src_w < 0) fi.src_w = 0;
+		if (fi.src_h < 0) fi.src_h = 0;
+	}
 
 	for (int i = FILL_COLOR; i < FILL_NUM_PARAMS; i++) {
 		if (params_ptrs[i]) PF_CHECKIN_PARAM(in_data, &param_storage[i]);

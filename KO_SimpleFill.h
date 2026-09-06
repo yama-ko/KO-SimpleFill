@@ -90,8 +90,12 @@ typedef struct FillInfo {
 	A_long     ditherSeed;  // Dither / Dither Only
 
 	// SmartRender only (legacy Render leaves these zeroed → sample inP directly).
+	A_long          is_smart;                  // 1 in SmartRender. Never fall back to inP there: it
+	                                           // aliases the output world, which AE has not written yet.
 	PF_EffectWorld *src_world;                 // masked source; NULL → use inP
 	A_long          src_off_x, src_off_y;      // src_world layer-space origin, minus output origin O
+	A_long          src_w, src_h;              // extent AE actually rendered, NOT the world's. Outside it
+	                                           // the pixels are whatever the buffer pool last held.
 	A_long          out_origin_x, out_origin_y; // output world origin O (composite-options mask bbox)
 } FillInfo, *FillInfoP, **FillInfoH;
 
