@@ -192,6 +192,10 @@ static void ApplyBlendRGB(
 // Per-pixel compose (normalized). xL/yL are LAYER-space coords (for dither).
 // -------------------------------------------------------------------
 
+
+// アルファ0のピクセルにRGBを書くと、ホストが色をアルファで割り戻して画面がノイズになる
+// （8bpcで出て16bpcでは出ない）。守りたいのはその1種類だけなので、全ピクセルに掛かる
+// 前乗算ではなく、退化した場所だけを潰す。KO BandFill / KO Foil と同じ形。
 struct OutPix { PF_FpLong r, g, b, a; };
 
 static OutPix Compose(
@@ -234,6 +238,7 @@ FillFunc8(void *refcon, A_long xL, A_long yL, PF_Pixel8 *inP, PF_Pixel8 *outP)
 
 	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
 		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
+	if (o.a <= 0.0) { o.r = o.g = o.b = o.a = 0.0; }
 	PF_FpLong a = o.a;
 
 	outP->red   = (A_u_char)(Clamp01(o.r) * 255.0 + 0.5);
@@ -264,6 +269,7 @@ FillFunc16(void *refcon, A_long xL, A_long yL, PF_Pixel16 *inP, PF_Pixel16 *outP
 
 	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
 		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
+	if (o.a <= 0.0) { o.r = o.g = o.b = o.a = 0.0; }
 	PF_FpLong a = o.a;
 
 	outP->red   = (A_u_short)(Clamp01(o.r) * max16 + 0.5);
@@ -293,6 +299,7 @@ FillFunc32(void *refcon, A_long xL, A_long yL, PF_PixelFloat *inP, PF_PixelFloat
 
 	OutPix o = Compose(sr, sg, sb, sa, fr, fg, fb, fiP->blendMode, fiP->amount,
 		xL + fiP->out_origin_x, yL + fiP->out_origin_y, fiP->ditherSeed);
+	if (o.a <= 0.0) { o.r = o.g = o.b = o.a = 0.0; }
 	PF_FpLong a = o.a;
 
 	// 32-bit float: preserve out-of-range (HDR) values, do not clamp rgb.
